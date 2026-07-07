@@ -1,3 +1,8 @@
+import os
+
+if not os.path.exists("database.db"):
+    from init_db import *  # noqa: F403
+
 from flask import Flask, render_template, request, redirect, session
 import hashlib
 
