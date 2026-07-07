@@ -26,12 +26,18 @@ def register():
 
         try:
             cursor.execute(
-                "INSERT INTO users (username, password) VALUES (%s, %s)",
+                "INSERT INTO users (username, password) VALUES (?, ?)",
                 (username, hashed_password)
             )
             conn.commit()
-        except:  # noqa: E722
-            return render_template("register.html", error="User already exists")
+
+        except Exception:
+            return render_template(
+                "register.html",
+                error="User already exists"
+            )
+
+        conn.close()
 
         return redirect("/login")
 
@@ -50,21 +56,26 @@ def login():
         hashed_password = hashlib.sha256(password.encode()).hexdigest()
 
         conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor()
 
         cursor.execute(
-            "SELECT * FROM users WHERE username=%s AND password=%s",
+            "SELECT * FROM users WHERE username=? AND password=?",
             (username, hashed_password)
         )
 
         user = cursor.fetchone()
+
+        conn.close()
 
         if user:
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             return redirect("/")
         else:
-            return render_template("login.html", error="Invalid credentials")
+            return render_template(
+                "login.html",
+                error="Invalid credentials"
+            )
 
     return render_template("login.html")
 
@@ -89,7 +100,7 @@ def index():
         content = data["content"]
 
         prompt = f"""
-Write a blog article.
+Write a professional blog article.
 
 Title: {title}
 Audience: {audience}
@@ -108,14 +119,25 @@ Content:
         cursor.execute("""
             INSERT INTO articles
             (title, source_url, scraped_content, ai_content, user_id)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (title, url, content, ai_text, session["user_id"]))
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            title,
+            url,
+            content,
+            ai_text,
+            session["user_id"]
+        ))
 
         conn.commit()
+        conn.close()
 
         pdf_file = generate_pdf(title, ai_text)
 
-        return render_template("result.html", article=ai_text, pdf_file=pdf_file)
+        return render_template(
+            "result.html",
+            article=ai_text,
+            pdf_file=pdf_file
+        )
 
     return render_template("index.html")
 
@@ -128,23 +150,30 @@ def history():
         return redirect("/login")
 
     conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
+    cursor = conn.cursor()
 
     cursor.execute("""
         SELECT * FROM articles
-        WHERE user_id=%s
+        WHERE user_id=?
         ORDER BY created_at DESC
     """, (session["user_id"],))
 
     articles = cursor.fetchall()
 
-    return render_template("history.html", articles=articles)
+    conn.close()
+
+    return render_template(
+        "history.html",
+        articles=articles
+    )
 
 
 # ---------------- LOGOUT ----------------
 @app.route("/logout")
 def logout():
+
     session.clear()
+
     return redirect("/login")
 
 
